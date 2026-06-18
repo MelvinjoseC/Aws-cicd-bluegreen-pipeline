@@ -1,0 +1,208 @@
+name: CI/CD pipeline
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: cicd-demo-app
+  ECS_CLUSTER: cicd-demo-cluster
+  CONTAINER_NAME: cicd-demo-app
+
+permissions:
+  id-token: write   # required for OIDC -> AWS auth
+  contents: read
+
+jobs:
+  # ---------------------------------------------------------------------
+  # 1. Unit tests
+  # ---------------------------------------------------------------------
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        working-directory: app
+        run: pip install -r requirements.txt pytest
+
+      - name: Run unit tests
+        working-directory: app
+        run: pytest -v
+
+  # ---------------------------------------------------------------------
+  # 2. Build image, scan for vulnerabilities, push to ECR (main only)
+  # ---------------------------------------------------------------------
+  build_and_scan:
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    outputs:
+      image_uri: ${{ steps.push.outputs.image_uri }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        working-directory: app
+        run: docker build -t cicd-demo-app:${{ github.sha }} .
+
+      - name: Scan image with Trivy
+        uses: aquasecurity/[email protected]
+        with:
+          image-ref: cicd-demo-app:${{ github.sha }}
+          format: table
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_GITHUB_OIDC_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: ecr_login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Tag and push image
+        id: push
+        run: |
+          IMAGE_URI="${{ steps.ecr_login.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}"
+          docker tag cicd-demo-app:${{ github.sha }} "$IMAGE_URI"
+          docker push "$IMAGE_URI"
+          echo "image_uri=$IMAGE_URI" >> "$GITHUB_OUTPUT"
+
+  # ---------------------------------------------------------------------
+  # 3. Deploy to dev (automatic, rolling update)
+  # ---------------------------------------------------------------------
+  deploy_dev:
+    needs: build_and_scan
+    runs-on: ubuntu-latest
+    environment: dev
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_GITHUB_OIDC_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Fetch current task definition
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition cicd-demo-dev \
+            --query taskDefinition > task-definition.json
+
+      - name: Render new image into task definition
+        id: render
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: task-definition.json
+          container-name: ${{ env.CONTAINER_NAME }}
+          image: ${{ needs.build_and_scan.outputs.image_uri }}
+
+      - name: Deploy to dev
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.render.outputs.task-definition }}
+          service: cicd-demo-dev
+          cluster: ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true
+
+  # ---------------------------------------------------------------------
+  # 4. Deploy to staging + run integration tests against it
+  # ---------------------------------------------------------------------
+  deploy_staging:
+    needs: deploy_dev
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_GITHUB_OIDC_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Fetch current task definition
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition cicd-demo-staging \
+            --query taskDefinition > task-definition.json
+
+      - name: Render new image into task definition
+        id: render
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: task-definition.json
+          container-name: ${{ env.CONTAINER_NAME }}
+          image: ${{ needs.build_and_scan.outputs.image_uri }}
+
+      - name: Deploy to staging
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.render.outputs.task-definition }}
+          service: cicd-demo-staging
+          cluster: ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run integration tests against staging
+        working-directory: app
+        run: python tests/integration_test.py "http://${{ secrets.STAGING_ALB_DNS }}"
+
+  # ---------------------------------------------------------------------
+  # 5. Production — gated by the "production" GitHub Environment's
+  #    required reviewers (Settings -> Environments -> production).
+  #    Deploys blue-green via CodeDeploy; CloudWatch alarm triggers an
+  #    automatic rollback if the new (green) task set fails health checks.
+  # ---------------------------------------------------------------------
+  deploy_prod:
+    needs: deploy_staging
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_GITHUB_OIDC_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Fetch current task definition
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition cicd-demo-prod \
+            --query taskDefinition > task-definition.json
+
+      - name: Render new image into task definition
+        id: render
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: task-definition.json
+          container-name: ${{ env.CONTAINER_NAME }}
+          image: ${{ needs.build_and_scan.outputs.image_uri }}
+
+      - name: Deploy to prod via CodeDeploy (blue-green)
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.render.outputs.task-definition }}
+          service: cicd-demo-prod
+          cluster: ${{ env.ECS_CLUSTER }}
+          codedeploy-appspec: appspec.yaml
+          codedeploy-application: cicd-demo-codedeploy-app
+          codedeploy-deployment-group: cicd-demo-prod-dg
+          wait-for-service-stability: true
