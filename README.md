@@ -46,6 +46,8 @@ Trivy.
   OIDC federation. No long-lived AWS access keys live in repo secrets.
 - **Infrastructure as code** — every AWS resource is defined in Terraform;
   there's no manual console clicking to recreate the environment.
+- **Linting & quality gates** — automated Python style/format checking using Ruff, and HCL validation using Terraform validation in CI/CD before any build is triggered.
+- **Workflow caching** — automatic caching of Python dependencies to speed up pipeline execution.
 
 ## Repository structure
 

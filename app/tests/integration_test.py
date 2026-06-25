@@ -6,6 +6,7 @@ service is actually serving traffic before promotion to production.
 Usage:
     python integration_test.py http://<staging-alb-dns-name>
 """
+
 import sys
 import time
 import urllib.error

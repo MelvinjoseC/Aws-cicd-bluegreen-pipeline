@@ -3,6 +3,7 @@
 Intentionally simple — the point of this project is the pipeline around it,
 not the application itself.
 """
+
 import os
 import socket
 
