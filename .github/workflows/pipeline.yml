@@ -70,6 +70,14 @@ jobs:
         working-directory: terraform
         run: terraform validate
 
+      - name: Run Checkov (IaC Security Scan)
+        uses: bridgecrewio/checkov-action@master
+        with:
+          directory: terraform
+          framework: terraform
+          output_format: cli
+          soft_fail: true
+
   # ---------------------------------------------------------------------
   # 2. Build image, scan for vulnerabilities, push to ECR (main only)
   # ---------------------------------------------------------------------
