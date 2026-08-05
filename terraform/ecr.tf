@@ -6,7 +6,9 @@ resource "aws_ecr_repository" "app" {
     scan_on_push = true
   }
 
-  tags = { Name = "${var.project_name}-ecr" }
+  tags = merge(local.common_tags, {
+    Name = "${var.project_name}-ecr"
+  })
 }
 
 resource "aws_ecr_lifecycle_policy" "app" {

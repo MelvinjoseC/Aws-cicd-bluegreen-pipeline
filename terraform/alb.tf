@@ -5,7 +5,10 @@ resource "aws_lb" "main" {
   security_groups    = [aws_security_group.alb.id]
   subnets            = aws_subnet.public[*].id
 
-  tags = { Name = "${var.project_name}-prod-alb" }
+  tags = merge(local.common_tags, {
+    Name        = "${var.project_name}-prod-alb"
+    Environment = "production"
+  })
 }
 
 resource "aws_lb_target_group" "blue" {
@@ -23,7 +26,10 @@ resource "aws_lb_target_group" "blue" {
     timeout             = 5
   }
 
-  tags = { Name = "${var.project_name}-tg-blue" }
+  tags = merge(local.common_tags, {
+    Name        = "${var.project_name}-tg-blue"
+    Environment = "production"
+  })
 }
 
 resource "aws_lb_target_group" "green" {
@@ -41,7 +47,10 @@ resource "aws_lb_target_group" "green" {
     timeout             = 5
   }
 
-  tags = { Name = "${var.project_name}-tg-green" }
+  tags = merge(local.common_tags, {
+    Name        = "${var.project_name}-tg-green"
+    Environment = "production"
+  })
 }
 
 resource "aws_lb_listener" "http" {

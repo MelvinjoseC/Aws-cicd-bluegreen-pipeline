@@ -18,7 +18,9 @@ resource "aws_security_group" "alb" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  tags = { Name = "${var.project_name}-alb-sg" }
+  tags = merge(local.common_tags, {
+    Name = "${var.project_name}-alb-sg"
+  })
 }
 
 resource "aws_security_group" "ecs_tasks" {
@@ -41,5 +43,7 @@ resource "aws_security_group" "ecs_tasks" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  tags = { Name = "${var.project_name}-ecs-tasks-sg" }
+  tags = merge(local.common_tags, {
+    Name = "${var.project_name}-ecs-tasks-sg"
+  })
 }

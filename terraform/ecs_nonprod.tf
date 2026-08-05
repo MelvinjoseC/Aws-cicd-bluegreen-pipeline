@@ -11,7 +11,10 @@ resource "aws_lb" "nonprod" {
   security_groups    = [aws_security_group.alb.id]
   subnets            = aws_subnet.public[*].id
 
-  tags = { Name = "${var.project_name}-${each.key}-alb" }
+  tags = merge(local.common_tags, {
+    Name        = "${var.project_name}-${each.key}-alb"
+    Environment = each.key
+  })
 }
 
 resource "aws_lb_target_group" "nonprod" {
@@ -31,7 +34,10 @@ resource "aws_lb_target_group" "nonprod" {
     timeout             = 5
   }
 
-  tags = { Name = "${var.project_name}-${each.key}-tg" }
+  tags = merge(local.common_tags, {
+    Name        = "${var.project_name}-${each.key}-tg"
+    Environment = each.key
+  })
 }
 
 resource "aws_lb_listener" "nonprod" {
