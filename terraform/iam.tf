@@ -145,3 +145,44 @@ resource "aws_iam_role_policy" "github_deploy" {
     ]
   })
 }
+
+# ---------------------------------------------------------------------
+# VPC Flow Logs IAM Role
+# ---------------------------------------------------------------------
+
+data "aws_iam_policy_document" "vpc_flow_log_assume" {
+  statement {
+    actions = ["sts:AssumeRole"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["vpc-flow-logs.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_iam_role" "vpc_flow_log" {
+  name               = "${var.project_name}-vpc-flow-log-role"
+  assume_role_policy = data.aws_iam_policy_document.vpc_flow_log_assume.json
+  tags               = local.common_tags
+}
+
+data "aws_iam_policy_document" "vpc_flow_log" {
+  statement {
+    actions = [
+      "logs:CreateLogStream",
+      "logs:PutLogEvents",
+      "logs:DescribeLogGroups",
+      "logs:DescribeLogStreams"
+    ]
+    resources = [
+      "*"
+    ]
+  }
+}
+
+resource "aws_iam_role_policy" "vpc_flow_log" {
+  name   = "${var.project_name}-vpc-flow-log-policy"
+  role   = aws_iam_role.vpc_flow_log.id
+  policy = data.aws_iam_policy_document.vpc_flow_log.json
+}

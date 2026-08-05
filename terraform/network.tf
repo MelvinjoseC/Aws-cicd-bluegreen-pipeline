@@ -96,3 +96,25 @@ resource "aws_route_table_association" "private" {
   subnet_id      = aws_subnet.private[count.index].id
   route_table_id = aws_route_table.private.id
 }
+
+# ---------------------------------------------------------------------
+# VPC Flow Logs & Log Group
+# ---------------------------------------------------------------------
+
+resource "aws_flow_log" "main" {
+  iam_role_arn    = aws_iam_role.vpc_flow_log.arn
+  log_destination = aws_cloudwatch_log_group.vpc_flow_log.arn
+  traffic_type    = "ALL"
+  vpc_id          = aws_vpc.main.id
+
+  tags = merge(local.common_tags, {
+    Name = "${var.project_name}-vpc-flow-log"
+  })
+}
+
+resource "aws_cloudwatch_log_group" "vpc_flow_log" {
+  name              = "/aws/vpc-flow-log/${var.project_name}"
+  retention_in_days = 30
+
+  tags = local.common_tags
+}
