@@ -90,13 +90,21 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
     outputs:
-      image_uri: ${{ steps.push.outputs.image_uri }}
+      image_uri: ${{ steps.ecr_login.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build image
-        working-directory: app
-        run: docker build -t cicd-demo-app:${{ github.sha }} .
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and load image locally (for scanning)
+        uses: docker/build-push-action@v5
+        with:
+          context: app
+          load: true
+          tags: cicd-demo-app:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Scan image with Trivy
         uses: aquasecurity/[email protected]
@@ -116,13 +124,14 @@ jobs:
         id: ecr_login
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Tag and push image
-        id: push
-        run: |
-          IMAGE_URI="${{ steps.ecr_login.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}"
-          docker tag cicd-demo-app:${{ github.sha }} "$IMAGE_URI"
-          docker push "$IMAGE_URI"
-          echo "image_uri=$IMAGE_URI" >> "$GITHUB_OUTPUT"
+      - name: Build and push image to ECR
+        uses: docker/build-push-action@v5
+        with:
+          context: app
+          push: true
+          tags: ${{ steps.ecr_login.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
   # ---------------------------------------------------------------------
   # 3. Deploy to dev (automatic, rolling update)
