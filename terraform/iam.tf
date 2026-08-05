@@ -102,7 +102,13 @@ resource "aws_iam_role_policy" "github_deploy" {
       {
         Effect = "Allow"
         Action = [
-          "ecr:GetAuthorizationToken",
+          "ecr:GetAuthorizationToken"
+        ]
+        Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
           "ecr:BatchCheckLayerAvailability",
           "ecr:GetDownloadUrlForLayer",
           "ecr:BatchGetImage",
@@ -111,15 +117,31 @@ resource "aws_iam_role_policy" "github_deploy" {
           "ecr:UploadLayerPart",
           "ecr:CompleteLayerUpload"
         ]
+        Resource = aws_ecr_repository.app.arn
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "ecs:RegisterTaskDefinition",
+          "ecs:DescribeTaskDefinition"
+        ]
         Resource = "*"
       },
       {
         Effect = "Allow"
         Action = [
           "ecs:DescribeServices",
-          "ecs:DescribeTaskDefinition",
-          "ecs:RegisterTaskDefinition",
-          "ecs:UpdateService",
+          "ecs:UpdateService"
+        ]
+        Resource = [
+          aws_ecs_service.prod.id,
+          aws_ecs_service.nonprod["dev"].id,
+          aws_ecs_service.nonprod["staging"].id
+        ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
           "ecs:DescribeTasks",
           "ecs:ListTasks"
         ]
@@ -129,13 +151,22 @@ resource "aws_iam_role_policy" "github_deploy" {
         Effect = "Allow"
         Action = [
           "codedeploy:GetApplication",
-          "codedeploy:GetDeploymentGroup",
-          "codedeploy:CreateDeployment",
-          "codedeploy:GetDeployment",
           "codedeploy:GetDeploymentConfig",
           "codedeploy:RegisterApplicationRevision"
         ]
         Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "codedeploy:GetDeploymentGroup",
+          "codedeploy:CreateDeployment",
+          "codedeploy:GetDeployment"
+        ]
+        Resource = [
+          aws_codedeploy_deployment_group.prod.arn,
+          aws_codedeploy_app.ecs_app.arn
+        ]
       },
       {
         Effect   = "Allow"
