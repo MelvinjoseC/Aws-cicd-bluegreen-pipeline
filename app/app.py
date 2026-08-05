@@ -4,12 +4,37 @@ Intentionally simple — the point of this project is the pipeline around it,
 not the application itself.
 """
 
+import json
+import logging
 import os
 import socket
+import sys
+
+# Custom JSON formatter for structured CloudWatch logging
+class JsonFormatter(logging.Formatter):
+    def format(self, record):
+        log_entry = {
+            "timestamp": self.formatTime(record, "%Y-%m-%dT%H:%M:%SZ"),
+            "level": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage()
+        }
+        if record.exc_info:
+            log_entry["exception"] = self.formatException(record.exc_info)
+        return json.dumps(log_entry)
+
+# Configure structured logging
+log_handler = logging.StreamHandler(sys.stdout)
+log_handler.setFormatter(JsonFormatter())
+logging.basicConfig(level=logging.INFO, handlers=[log_handler], force=True)
 
 from flask import Flask, jsonify
 
 app = Flask(__name__)
+
+# Ensure flask log messages use our handler
+app.logger.handlers = [log_handler]
+app.logger.setLevel(logging.INFO)
 
 APP_VERSION = os.environ.get("APP_VERSION", "1.0.0")
 
