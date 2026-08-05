@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: ["main"]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 env:
   AWS_REGION: us-east-1
   ECR_REPOSITORY: cicd-demo-app
