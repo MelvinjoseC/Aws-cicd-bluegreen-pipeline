@@ -19,6 +19,7 @@ env:
 permissions:
   id-token: write   # required for OIDC -> AWS auth
   contents: read
+  security-events: write  # required for uploading SARIF reports to GitHub Security tab
 
 jobs:
   # ---------------------------------------------------------------------
@@ -106,8 +107,22 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Scan image with Trivy
-        uses: aquasecurity/[email protected]
+      - name: Scan image with Trivy (SARIF Report)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: cicd-demo-app:${{ github.sha }}
+          format: sarif
+          output: trivy-results.sarif
+          severity: CRITICAL,HIGH
+
+      - name: Upload Trivy scan results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-results.sarif
+
+      - name: Scan image with Trivy (Terminal Fail Gate)
+        uses: aquasecurity/trivy-action@master
         with:
           image-ref: cicd-demo-app:${{ github.sha }}
           format: table
