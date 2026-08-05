@@ -19,7 +19,10 @@ resource "aws_codedeploy_deployment_group" "prod" {
   # the traffic shift and rolls back to the previous task set.
   alarm_configuration {
     enabled = true
-    alarms  = [aws_cloudwatch_metric_alarm.prod_5xx.alarm_name]
+    alarms  = [
+      aws_cloudwatch_metric_alarm.prod_5xx_blue.alarm_name,
+      aws_cloudwatch_metric_alarm.prod_5xx_green.alarm_name
+    ]
   }
 
   blue_green_deployment_config {
