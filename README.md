@@ -155,5 +155,13 @@ running — run `terraform destroy` when you're done experimenting.
   failed health checks.
 - Provisioned all AWS infrastructure (VPC, ECS, ALB, IAM, CodeDeploy) as
   code with Terraform, enabling a fully reproducible environment.
-- Configured keyless AWS authentication for CI using OIDC federation,
-  removing long-lived IAM credentials from the repository entirely.
+- Configured keyless AWS authentication for CI using OIDC federation, removing long-lived IAM credentials from the repository entirely.
+- **[Harden]** Restricted container execution to a non-privileged system user (`appuser:appgroup`) in the Dockerfile.
+- **[Observability]** Integrated structured JSON formatting for standard output logs to enable native Amazon CloudWatch Log Insights querying.
+- **[Tracing & Security]** Added request tracking headers (`X-Request-ID` trace propagation) and OWASP-compliant security headers (CSP, Frame Options, XSS).
+- **[CI/CD Caching]** Configured Docker Buildx layer caching with GitHub Actions runner cache backend to optimize build times.
+- **[Vulnerability Audits]** Connected Trivy security scanning to export SARIF reports, publishing interactive vulnerability dashboard feeds to the GitHub Security tab.
+- **[Data Protection]** Secured the ECR registry with AWS KMS encryption for stored artifact confidentiality.
+- **[Network Auditing]** Configured VPC Flow Logs outputting telemetry records to CloudWatch Log Groups for compliance audits.
+- **[Reliability]** Implemented dual target-group CloudWatch alarms for CodeDeploy to ensure reliable automatic rollback triggers regardless of the active target group role.
+- **[Least Privilege]** Scoped down IAM execution and deployment roles, replacing wildcard permissions with target resource-level ARN constraints.
