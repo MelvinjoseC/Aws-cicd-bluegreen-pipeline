@@ -73,8 +73,8 @@ resource "aws_ecs_service" "prod" {
   }
 
   # After the first deploy, CodeDeploy owns task definition and target
-  # group swaps for this service — Terraform should leave them alone.
+  # group swaps, and Application Auto Scaling manages desired_count.
   lifecycle {
-    ignore_changes = [task_definition, load_balancer]
+    ignore_changes = [task_definition, load_balancer, desired_count]
   }
 }

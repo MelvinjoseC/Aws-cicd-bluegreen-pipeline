@@ -70,3 +70,37 @@ variable "github_org_repo" {
     error_message = "The github_org_repo must be formatted as 'organization-or-user/repository'."
   }
 }
+
+variable "ecs_autoscale_min_capacity" {
+  description = "Minimum number of tasks for production ECS service autoscaling"
+  type        = number
+  default     = 2
+
+  validation {
+    condition     = var.ecs_autoscale_min_capacity >= 1
+    error_message = "Minimum autoscaling capacity must be at least 1."
+  }
+}
+
+variable "ecs_autoscale_max_capacity" {
+  description = "Maximum number of tasks for production ECS service autoscaling"
+  type        = number
+  default     = 10
+
+  validation {
+    condition     = var.ecs_autoscale_max_capacity >= 2
+    error_message = "Maximum autoscaling capacity must be at least 2."
+  }
+}
+
+variable "ecs_target_cpu_utilization" {
+  description = "Target average CPU utilization percentage for autoscaling trigger"
+  type        = number
+  default     = 70
+}
+
+variable "ecs_target_memory_utilization" {
+  description = "Target average Memory utilization percentage for autoscaling trigger"
+  type        = number
+  default     = 80
+}
