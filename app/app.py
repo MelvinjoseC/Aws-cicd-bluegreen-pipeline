@@ -7,6 +7,7 @@ not the application itself.
 import json
 import logging
 import os
+import signal
 import socket
 import sys
 import time
@@ -107,6 +108,20 @@ def internal_error(error):
 
 # Application readiness state (can be toggled during graceful shutdown)
 IS_READY = True
+
+def handle_shutdown_signal(signum, frame=None):
+    """Handle graceful shutdown signals (SIGTERM/SIGINT) by marking service unready."""
+    global IS_READY
+    sig_name = signal.Signals(signum).name if hasattr(signal, "Signals") and isinstance(signum, signal.Signals) else str(signum)
+    app.logger.warning(f"Received termination signal {sig_name}. Setting IS_READY=False to drain traffic gracefully.")
+    IS_READY = False
+
+# Register signal handlers when run in the main thread
+try:
+    signal.signal(signal.SIGTERM, handle_shutdown_signal)
+    signal.signal(signal.SIGINT, handle_shutdown_signal)
+except (ValueError, AttributeError):
+    pass
 
 @app.route("/livez")
 def livez():

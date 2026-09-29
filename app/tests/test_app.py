@@ -32,6 +32,35 @@ def test_readiness():
     assert resp.get_json()["status"] == "ready"
 
 
+def test_graceful_shutdown_drain():
+    from app import handle_shutdown_signal, app as flask_app
+    import app as app_module
+    import signal
+
+    client = get_client()
+    try:
+        # Simulate SIGTERM receipt
+        handle_shutdown_signal(signal.SIGTERM)
+        assert app_module.IS_READY is False
+
+        # Both readyz and health must now return 503 Service Unavailable
+        resp_ready = client.get("/readyz")
+        assert resp_ready.status_code == 503
+        assert resp_ready.get_json()["status"] == "draining"
+
+        resp_health = client.get("/health")
+        assert resp_health.status_code == 503
+        assert resp_health.get_json()["status"] == "unhealthy"
+
+        # Liveness must still return 200 while draining active requests
+        resp_live = client.get("/livez")
+        assert resp_live.status_code == 200
+        assert resp_live.get_json()["status"] == "alive"
+    finally:
+        # Restore readiness state for remaining tests
+        app_module.IS_READY = True
+
+
 def test_version():
     client = get_client()
     resp = client.get("/version")
