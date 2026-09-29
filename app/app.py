@@ -78,9 +78,26 @@ def internal_error(error):
     app.logger.error(f"Internal server error: {error}", exc_info=True)
     return jsonify(error="Internal Server Error", message="An unexpected error occurred"), 500
 
+# Application readiness state (can be toggled during graceful shutdown)
+IS_READY = True
+
+@app.route("/livez")
+def livez():
+    """Liveness probe: returns 200 if the Python process is alive and responsive."""
+    return jsonify(status="alive", service="cicd-demo-app"), 200
+
+@app.route("/readyz")
+def readyz():
+    """Readiness probe: returns 200 if the service is ready to accept user traffic."""
+    if not IS_READY:
+        return jsonify(status="draining", message="Service is shutting down or not ready"), 503
+    return jsonify(status="ready", service="cicd-demo-app"), 200
+
 @app.route("/health")
 def health():
     """Used by the ALB target group health check and CodeDeploy validation."""
+    if not IS_READY:
+        return jsonify(status="unhealthy", message="Service draining"), 503
     return jsonify(status="ok"), 200
 
 @app.route("/version")

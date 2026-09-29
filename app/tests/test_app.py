@@ -18,6 +18,20 @@ def test_health():
     assert resp.get_json()["status"] == "ok"
 
 
+def test_liveness():
+    client = get_client()
+    resp = client.get("/livez")
+    assert resp.status_code == 200
+    assert resp.get_json()["status"] == "alive"
+
+
+def test_readiness():
+    client = get_client()
+    resp = client.get("/readyz")
+    assert resp.status_code == 200
+    assert resp.get_json()["status"] == "ready"
+
+
 def test_version():
     client = get_client()
     resp = client.get("/version")
