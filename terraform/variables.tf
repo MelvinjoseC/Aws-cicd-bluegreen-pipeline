@@ -104,3 +104,9 @@ variable "ecs_target_memory_utilization" {
   type        = number
   default     = 80
 }
+
+variable "enable_multi_az_nat" {
+  description = "Enable dedicated NAT Gateways per AZ for high availability in production (false uses single NAT gateway for cost efficiency)"
+  type        = bool
+  default     = false
+}
