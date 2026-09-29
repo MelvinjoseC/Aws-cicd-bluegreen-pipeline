@@ -38,13 +38,21 @@ jobs:
 
       - name: Install dependencies
         working-directory: app
-        run: pip install -r requirements.txt pytest ruff
+        run: pip install -r requirements.txt pytest ruff bandit pip-audit
 
       - name: Run linter (Ruff)
         working-directory: app
         run: |
           ruff check .
           ruff format --check .
+
+      - name: Run SAST Security Scan (Bandit)
+        working-directory: app
+        run: bandit -r . -x tests -ll
+
+      - name: Run Dependency Vulnerability Audit (pip-audit)
+        working-directory: app
+        run: pip-audit -r requirements.txt
 
       - name: Run unit tests
         working-directory: app
