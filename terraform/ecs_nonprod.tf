@@ -79,6 +79,14 @@ resource "aws_ecs_task_definition" "nonprod" {
       containerPort = var.container_port
       protocol      = "tcp"
     }]
+    stopTimeout = 30
+    healthCheck = {
+      command     = ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8080/livez')\" || exit 1"]
+      interval    = 15
+      timeout     = 5
+      retries     = 3
+      startPeriod = 10
+    }
     logConfiguration = {
       logDriver = "awslogs"
       options = {
@@ -93,11 +101,12 @@ resource "aws_ecs_task_definition" "nonprod" {
 resource "aws_ecs_service" "nonprod" {
   for_each = toset(local.nonprod_envs)
 
-  name            = "${var.project_name}-${each.key}"
-  cluster         = aws_ecs_cluster.main.id
-  task_definition = aws_ecs_task_definition.nonprod[each.key].arn
-  desired_count   = 1
-  launch_type     = "FARGATE"
+  name                              = "${var.project_name}-${each.key}"
+  cluster                           = aws_ecs_cluster.main.id
+  task_definition                   = aws_ecs_task_definition.nonprod[each.key].arn
+  desired_count                     = 1
+  launch_type                       = "FARGATE"
+  health_check_grace_period_seconds = 30
 
   network_configuration {
     subnets          = aws_subnet.private[*].id

@@ -29,6 +29,14 @@ resource "aws_ecs_task_definition" "prod" {
       containerPort = var.container_port
       protocol      = "tcp"
     }]
+    stopTimeout = 30
+    healthCheck = {
+      command     = ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8080/livez')\" || exit 1"]
+      interval    = 15
+      timeout     = 5
+      retries     = 3
+      startPeriod = 10
+    }
     logConfiguration = {
       logDriver = "awslogs"
       options = {
@@ -41,11 +49,12 @@ resource "aws_ecs_task_definition" "prod" {
 }
 
 resource "aws_ecs_service" "prod" {
-  name            = "${var.project_name}-prod"
-  cluster         = aws_ecs_cluster.main.id
-  task_definition = aws_ecs_task_definition.prod.arn
-  desired_count   = 2
-  launch_type     = "FARGATE"
+  name                              = "${var.project_name}-prod"
+  cluster                           = aws_ecs_cluster.main.id
+  task_definition                   = aws_ecs_task_definition.prod.arn
+  desired_count                     = 2
+  launch_type                       = "FARGATE"
+  health_check_grace_period_seconds = 30
 
   deployment_controller {
     type = "CODE_DEPLOY"
