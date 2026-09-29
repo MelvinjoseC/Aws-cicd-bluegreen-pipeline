@@ -9,8 +9,10 @@ import logging
 import os
 import socket
 import sys
+import time
 import uuid
-from flask import Flask, jsonify, request, g
+from flask import Flask, jsonify, request, g, Response
+from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
 
 # Custom JSON formatter for structured CloudWatch logging with request ID tracking
 class JsonFormatter(logging.Formatter):
@@ -46,16 +48,30 @@ app.logger.setLevel(logging.INFO)
 
 APP_VERSION = os.environ.get("APP_VERSION", "1.0.0")
 
+# Prometheus Metrics definition
+METRICS_REQUEST_COUNT = Counter(
+    "http_requests_total",
+    "Total HTTP requests handled by the application",
+    ["method", "endpoint", "status"]
+)
+METRICS_REQUEST_LATENCY = Histogram(
+    "http_request_duration_seconds",
+    "HTTP request latency in seconds",
+    ["method", "endpoint"],
+    buckets=[0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0]
+)
+
 @app.before_request
 def before_request():
-    """Extract or generate a unique request ID for request tracing."""
+    """Extract or generate a unique request ID for request tracing and mark start time."""
+    g.start_time = time.time()
     request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
     g.request_id = request_id
     app.logger.info(f"Started {request.method} {request.path}")
 
 @app.after_request
 def after_request(response):
-    """Add secure HTTP headers and return the request ID to the client."""
+    """Add secure HTTP headers, record Prometheus metrics, and return the request ID."""
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["Content-Security-Policy"] = "default-src 'self'"
@@ -64,6 +80,17 @@ def after_request(response):
     
     if hasattr(g, "request_id"):
         response.headers["X-Request-ID"] = g.request_id
+
+    # Record metrics for non-metrics endpoints
+    if request.path != "/metrics":
+        duration = time.time() - getattr(g, "start_time", time.time())
+        endpoint = request.endpoint or request.path
+        METRICS_REQUEST_LATENCY.labels(method=request.method, endpoint=endpoint).observe(duration)
+        METRICS_REQUEST_COUNT.labels(
+            method=request.method,
+            endpoint=endpoint,
+            status=response.status_code
+        ).inc()
         
     app.logger.info(f"Finished {request.method} {request.path} with status {response.status_code}")
     return response
@@ -112,6 +139,11 @@ def list_items():
         {"id": 3, "name": "Deployment"},
     ]
     return jsonify(items=items), 200
+
+@app.route("/metrics")
+def metrics():
+    """Prometheus metrics endpoint exposing request counts, latencies, and process stats."""
+    return Response(generate_latest(), mimetype=CONTENT_TYPE_LATEST)
 
 @app.route("/")
 def index():

@@ -57,6 +57,19 @@ def test_index():
     assert "version" in resp.get_json()
 
 
+def test_metrics():
+    client = get_client()
+    # Trigger requests to exercise metric observation
+    client.get("/health")
+    client.get("/version")
+    resp = client.get("/metrics")
+    assert resp.status_code == 200
+    assert "text/plain" in resp.content_type
+    metric_data = resp.data.decode("utf-8")
+    assert "http_requests_total" in metric_data
+    assert "http_request_duration_seconds" in metric_data
+
+
 def test_security_headers():
     client = get_client()
     resp = client.get("/")
