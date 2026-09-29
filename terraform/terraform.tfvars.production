@@ -1,0 +1,19 @@
+# Production Environment Variables (High-Availability Enterprise Profile)
+aws_region          = "us-east-1"
+project_name        = "cicd-demo-prod"
+github_org_repo     = "MelvinjoseC/Aws-cicd-bluegreen-pipeline"
+
+# Network configuration (Dedicated NAT Gateways per AZ for zero single-point-of-failure)
+enable_multi_az_nat = true
+vpc_cidr            = "10.0.0.0/16"
+public_subnet_cidrs = ["10.0.1.0/24", "10.0.2.0/24"]
+private_subnet_cidrs = ["10.0.11.0/24", "10.0.12.0/24"]
+
+# Compute sizing & Autoscaling
+task_cpu                      = "512"
+task_memory                   = "1024"
+container_port                = 8080
+ecs_autoscale_min_capacity    = 2
+ecs_autoscale_max_capacity    = 10
+ecs_target_cpu_utilization    = 70
+ecs_target_memory_utilization = 80

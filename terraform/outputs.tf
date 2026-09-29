@@ -27,3 +27,18 @@ output "ecs_cluster_name" {
   description = "ECS cluster name"
   value       = aws_ecs_cluster.main.name
 }
+
+output "waf_web_acl_arn" {
+  description = "ARN of the AWS WAFv2 Web ACL protecting the production ALB"
+  value       = aws_wafv2_web_acl.main.arn
+}
+
+output "alb_access_logs_bucket" {
+  description = "S3 bucket receiving encrypted ALB access logs"
+  value       = aws_s3_bucket.alb_logs.bucket
+}
+
+output "cloudwatch_dashboard_name" {
+  description = "Name of the production CloudWatch Operational Dashboard"
+  value       = aws_cloudwatch_dashboard.prod.dashboard_name
+}

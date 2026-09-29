@@ -1,0 +1,18 @@
+# Staging Environment Variables
+aws_region          = "us-east-1"
+project_name        = "cicd-demo-staging"
+github_org_repo     = "MelvinjoseC/Aws-cicd-bluegreen-pipeline"
+
+# Network configuration (Single NAT Gateway for cost-efficiency)
+enable_multi_az_nat = false
+vpc_cidr            = "10.1.0.0/16"
+public_subnet_cidrs = ["10.1.1.0/24", "10.1.2.0/24"]
+private_subnet_cidrs = ["10.1.11.0/24", "10.1.12.0/24"]
+
+# Compute sizing & Autoscaling
+task_cpu                   = "256"
+task_memory                = "512"
+container_port             = 8080
+ecs_autoscale_min_capacity = 1
+ecs_autoscale_max_capacity = 3
+ecs_target_cpu_utilization = 75
