@@ -16,6 +16,7 @@ import time
 import uuid
 from flask import Flask, jsonify, request, g, Response
 from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
+from rate_limiter import TokenBucketRateLimiter
 
 START_TIME = time.time()
 
@@ -57,6 +58,9 @@ app.logger.handlers = [log_handler]
 app.logger.setLevel(logging.INFO)
 
 APP_VERSION = os.environ.get("APP_VERSION", "1.0.0")
+# Application in-memory rate limiter (protects worker threads against burst flooding)
+RATE_LIMITER = TokenBucketRateLimiter(rate=100.0, capacity=200.0)
+
 
 # Prometheus Metrics definition
 METRICS_REQUEST_COUNT = Counter(
@@ -100,6 +104,13 @@ def before_request():
     g.start_time = time.time()
     g.request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
     g.trace_id, g.span_id, g.xray_header = _extract_or_generate_trace()
+
+    # Rate limiting protection (bypass probe and metric endpoints)
+    if request.path not in ["/livez", "/readyz", "/health", "/health/diagnostic", "/metrics"]:
+        client_ip = request.headers.get("X-Forwarded-For", request.remote_addr or "unknown").split(",")[0].strip()
+        if not RATE_LIMITER.is_allowed(client_ip):
+            app.logger.warning(f"Rate limit exceeded for client {client_ip} on {request.path}")
+            return jsonify(error="Too Many Requests", message="Rate limit exceeded. Please throttle requests."), 429
     app.logger.info(f"Started {request.method} {request.path}")
 
 @app.after_request
