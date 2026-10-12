@@ -1,0 +1,41 @@
+name: Container Image Signing & Verification (Cosign)
+
+on:
+  workflow_call:
+    inputs:
+      image_uri:
+        required: true
+        type: string
+        description: "Full URI of container image in ECR"
+
+jobs:
+  cosign_sign_verify:
+    name: Cosign Keyless Sign & Verify
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3.5.0
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_GITHUB_OIDC_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Sign container image with OIDC identity
+        run: |
+          echo "Signing container image with Sigstore Cosign..."
+          cosign sign --yes ${{ inputs.image_uri }}
+
+      - name: Verify signature
+        run: |
+          echo "Verifying signature certificate and OIDC issuer..."
+          cosign verify ${{ inputs.image_uri }} \
+            --certificate-identity-regexp "https://github.com/${{ github.repository }}" \
+            --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
