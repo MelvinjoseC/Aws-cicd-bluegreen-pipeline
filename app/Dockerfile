@@ -1,7 +1,7 @@
 # =====================================================================
 # Stage 1: Build stage (compile wheels and prepare isolated environment)
 # =====================================================================
-FROM python:3.12-slim AS builder
+FROM python:3.14-slim AS builder
 
 WORKDIR /build
 
@@ -15,7 +15,7 @@ RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 # =====================================================================
 # Stage 2: Runtime stage (minimal, hardened production container)
 # =====================================================================
-FROM python:3.12-slim AS runtime
+FROM python:3.14-slim AS runtime
 
 # Install dumb-init for resilient PID 1 signal forwarding
 RUN apt-get update && \
