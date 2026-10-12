@@ -7,15 +7,19 @@ not the application itself.
 import json
 import logging
 import os
+import re
 import signal
 import socket
 import sys
+import threading
 import time
 import uuid
 from flask import Flask, jsonify, request, g, Response
 from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
 
-# Custom JSON formatter for structured CloudWatch logging with request ID tracking
+START_TIME = time.time()
+
+# Custom JSON formatter for structured CloudWatch logging with request ID and trace tracking
 class JsonFormatter(logging.Formatter):
     def format(self, record):
         log_entry = {
@@ -24,11 +28,16 @@ class JsonFormatter(logging.Formatter):
             "logger": record.name,
             "message": record.getMessage()
         }
-        # Add request_id if available in Flask request context
+        # Add request_id and trace_id if available in Flask request context
         try:
             from flask import has_request_context
-            if has_request_context() and hasattr(g, "request_id"):
-                log_entry["request_id"] = g.request_id
+            if has_request_context():
+                if hasattr(g, "request_id"):
+                    log_entry["request_id"] = g.request_id
+                if hasattr(g, "trace_id"):
+                    log_entry["trace_id"] = g.trace_id
+                if hasattr(g, "span_id"):
+                    log_entry["span_id"] = g.span_id
         except Exception:
             pass
 
@@ -62,17 +71,40 @@ METRICS_REQUEST_LATENCY = Histogram(
     buckets=[0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0]
 )
 
+def _extract_or_generate_trace():
+    """Extract AWS X-Ray (X-Amzn-Trace-Id) or W3C traceparent, else generate new."""
+    xray_header = request.headers.get("X-Amzn-Trace-Id")
+    traceparent = request.headers.get("traceparent")
+    
+    if xray_header:
+        # e.g., Root=1-5759e988-bd862e3fc1be4e0947f4f699;Parent=53995cbe3140f4c0;Sampled=1
+        match = re.search(r"Root=([^;]+)", xray_header)
+        trace_id = match.group(1) if match else str(uuid.uuid4())
+        span_id = uuid.uuid4().hex[:16]
+        return trace_id, span_id, xray_header
+    elif traceparent:
+        # Format: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01
+        parts = traceparent.split("-")
+        if len(parts) == 4:
+            return parts[1], parts[2], traceparent
+            
+    # Fallback generated trace
+    trace_id = f"1-{int(time.time()):x}-{uuid.uuid4().hex[:24]}"
+    span_id = uuid.uuid4().hex[:16]
+    generated_xray = f"Root={trace_id};Parent={span_id};Sampled=1"
+    return trace_id, span_id, generated_xray
+
 @app.before_request
 def before_request():
-    """Extract or generate a unique request ID for request tracing and mark start time."""
+    """Extract or generate unique request ID & trace ID for distributed tracing."""
     g.start_time = time.time()
-    request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
-    g.request_id = request_id
+    g.request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
+    g.trace_id, g.span_id, g.xray_header = _extract_or_generate_trace()
     app.logger.info(f"Started {request.method} {request.path}")
 
 @app.after_request
 def after_request(response):
-    """Add secure HTTP headers, record Prometheus metrics, and return the request ID."""
+    """Add secure HTTP headers, record Prometheus metrics, and return trace headers."""
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["Content-Security-Policy"] = "default-src 'self'"
@@ -81,6 +113,9 @@ def after_request(response):
     
     if hasattr(g, "request_id"):
         response.headers["X-Request-ID"] = g.request_id
+    if hasattr(g, "trace_id"):
+        response.headers["X-Amzn-Trace-Id"] = g.xray_header
+        response.headers["traceparent"] = f"00-{g.trace_id.replace('-', ''):0>32}-{g.span_id}-01"
 
     # Record metrics for non-metrics endpoints
     if request.path != "/metrics":
@@ -163,7 +198,6 @@ def metrics():
 @app.route("/")
 def index():
     return jsonify(message="CI/CD demo service", version=APP_VERSION), 200
-
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8080)  # nosec B104
