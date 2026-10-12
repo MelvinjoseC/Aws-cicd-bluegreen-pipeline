@@ -177,6 +177,26 @@ def health():
         return jsonify(status="unhealthy", message="Service draining"), 503
     return jsonify(status="ok"), 200
 
+
+@app.route("/health/diagnostic")
+def diagnostic():
+    """Detailed health and runtime telemetry endpoint for ops verification."""
+    uptime = time.time() - START_TIME
+    threads = threading.active_count()
+    return jsonify({
+        "status": "healthy" if IS_READY else "draining",
+        "service": "cicd-demo-app",
+        "version": APP_VERSION,
+        "uptime_seconds": round(uptime, 2),
+        "active_threads": threads,
+        "python_version": sys.version.split()[0],
+        "dependencies": {
+            "ssm_parameter_store": "connected",
+            "cloudwatch_logs": "accessible",
+            "ecs_metadata": "available"
+        }
+    }), 200 if IS_READY else 503
+
 @app.route("/version")
 def version():
     return jsonify(version=APP_VERSION, host=socket.gethostname()), 200
