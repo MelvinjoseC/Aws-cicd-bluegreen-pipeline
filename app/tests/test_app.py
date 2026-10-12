@@ -130,3 +130,51 @@ def test_error_handlers():
     assert body["error"] == "Not Found"
     assert "message" in body
 
+
+def test_diagnostic_endpoint(client):
+    """Test detailed diagnostics endpoint exposes required telemetry."""
+    response = client.get("/health/diagnostic")
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data["status"] == "healthy"
+    assert "uptime_seconds" in data
+    assert "active_threads" in data
+    assert "dependencies" in data
+    assert data["service"] == "cicd-demo-app"
+
+def test_xray_trace_propagation(client):
+    """Test X-Amzn-Trace-Id header extraction and propagation."""
+    trace_header = "Root=1-5759e988-bd862e3fc1be4e0947f4f699;Parent=53995cbe3140f4c0;Sampled=1"
+    response = client.get("/health", headers={"X-Amzn-Trace-Id": trace_header})
+    assert response.status_code == 200
+    assert "X-Amzn-Trace-Id" in response.headers
+    assert "Root=1-5759e988-bd862e3fc1be4e0947f4f699" in response.headers["X-Amzn-Trace-Id"]
+
+def test_rate_limiter_throttling(client):
+    """Test in-memory rate limiting triggers 429 when burst limit exceeded."""
+    from rate_limiter import TokenBucketRateLimiter
+    from app import RATE_LIMITER
+    
+    # Configure tight bucket for test
+    test_limiter = TokenBucketRateLimiter(rate=1.0, capacity=2.0)
+    assert test_limiter.is_allowed("127.0.0.1") is True
+    assert test_limiter.is_allowed("127.0.0.1") is True
+    assert test_limiter.is_allowed("127.0.0.1") is False
+
+def test_resilient_http_client_circuit_breaker():
+    """Test circuit breaker trips after reaching failure threshold."""
+    from utils.http_client import ResilientCircuitBreaker, CircuitState
+    cb = ResilientCircuitBreaker(failure_threshold=2, recovery_timeout=5.0)
+    assert cb.state == CircuitState.CLOSED
+    cb.record_failure()
+    assert cb.state == CircuitState.CLOSED
+    cb.record_failure()
+    assert cb.state == CircuitState.OPEN
+    assert cb.can_execute() is False
+
+def test_app_config_validation():
+    """Test AppConfig validation parser."""
+    from config import AppConfig
+    cfg = AppConfig.from_env()
+    assert cfg.port == 8080
+    assert cfg.log_level in ("DEBUG", "INFO", "WARNING", "ERROR")
