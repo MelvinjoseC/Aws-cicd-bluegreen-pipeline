@@ -54,6 +54,10 @@ resource "aws_codedeploy_deployment_group" "prod" {
         listener_arns = [aws_lb_listener.http.arn]
       }
 
+      test_traffic_route {
+        listener_arns = [aws_lb_listener.test.arn]
+      }
+
       target_group {
         name = aws_lb_target_group.blue.name
       }

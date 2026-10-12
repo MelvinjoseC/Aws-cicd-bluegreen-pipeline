@@ -75,3 +75,19 @@ resource "aws_lb_listener" "http" {
     ignore_changes = [default_action]
   }
 }
+
+# Test listener on port 8443 for CodeDeploy pre-traffic validation hook
+resource "aws_lb_listener" "test" {
+  load_balancer_arn = aws_lb.main.arn
+  port              = 8443
+  protocol          = "HTTP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.green.arn
+  }
+
+  lifecycle {
+    ignore_changes = [default_action]
+  }
+}
