@@ -306,3 +306,5 @@ jobs:
           echo "| **Container Image** | \`${{ needs.build_and_scan.outputs.image_uri }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| **Traffic Shifting Pattern** | Canary 10% for 5 Minutes |" >> $GITHUB_STEP_SUMMARY
           echo "| **Rollback Monitoring** | HTTP 5XX Spikes & P95 Latency Alarms |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Automated Rollback Triggers** | 5XX Error Rates, Latency > 200ms, Canary Failures |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Pre-Traffic Hook** | Validated via Port 8443 Test Listener |" >> $GITHUB_STEP_SUMMARY
