@@ -1,0 +1,33 @@
+name: Software Bill of Materials (SBOM)
+
+on:
+  workflow_call:
+    inputs:
+      image_ref:
+        required: true
+        type: string
+
+jobs:
+  sbom_generate:
+    name: Generate & Publish SBOM
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Generate SBOM (SPDX-JSON)
+        uses: anchore/sbom-action@v0.16.0
+        with:
+          image: ${{ inputs.image_ref }}
+          format: spdx-json
+          output-file: app-sbom.spdx.json
+
+      - name: Upload SBOM Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: spdx-sbom
+          path: app-sbom.spdx.json
+          retention-days: 14
