@@ -17,7 +17,11 @@ RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 # =====================================================================
 FROM python:3.12-slim AS runtime
 
-# Set non-interactive and unbuffered python environment
+# Install dumb-init for resilient PID 1 signal forwarding
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends dumb-init && \
+    rm -rf /var/lib/apt/lists/*
+
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PATH="/install/bin:${PATH}" \
@@ -32,8 +36,8 @@ WORKDIR /app
 # Copy installed Python dependencies from builder stage
 COPY --from=builder /install /install
 
-# Copy application source and gunicorn config
-COPY app.py gunicorn.conf.py ./
+# Copy all application files
+COPY . .
 
 # Secure file permissions and switch to non-root user
 RUN chown -R appuser:appgroup /app
@@ -47,4 +51,5 @@ EXPOSE 8080
 HEALTHCHECK --interval=15s --timeout=3s --start-period=5s --retries=3 \
   CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8080/livez')" || exit 1
 
+ENTRYPOINT ["/usr/bin/dumb-init", "--"]
 CMD ["gunicorn", "-c", "gunicorn.conf.py", "app:app"]
