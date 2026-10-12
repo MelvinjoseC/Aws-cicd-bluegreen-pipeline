@@ -18,6 +18,10 @@ resource "aws_ecs_task_definition" "prod" {
   network_mode             = "awsvpc"
   cpu                      = var.task_cpu
   memory                   = var.task_memory
+
+  ephemeral_storage {
+    size_in_gib = 30
+  }
   execution_role_arn       = aws_iam_role.ecs_execution.arn
   task_role_arn            = aws_iam_role.ecs_task.arn
 
@@ -30,6 +34,14 @@ resource "aws_ecs_task_definition" "prod" {
       protocol      = "tcp"
     }]
     stopTimeout = 30
+    linuxParameters = {
+      initProcessEnabled = true
+    }
+    ulimits = [{
+      name      = "nofile"
+      softLimit = 65536
+      hardLimit = 65536
+    }]
     healthCheck = {
       command     = ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8080/livez')\" || exit 1"]
       interval    = 15
