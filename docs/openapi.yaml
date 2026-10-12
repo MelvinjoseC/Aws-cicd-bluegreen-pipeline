@@ -1,0 +1,55 @@
+openapi: 3.1.0
+info:
+  title: AWS CI/CD Blue-Green Demo Service API
+  version: 1.0.0
+  description: Enterprise microservice endpoints for ECS blue/green validation and health checks.
+paths:
+  /:
+    get:
+      summary: Root service overview
+      responses:
+        '200':
+          description: Service information
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  version:
+                    type: string
+  /health:
+    get:
+      summary: Load balancer target group health probe
+      responses:
+        '200':
+          description: Healthy
+        '503':
+          description: Service draining or unhealthy
+  /livez:
+    get:
+      summary: Process liveness probe
+      responses:
+        '200':
+          description: Process alive
+  /readyz:
+    get:
+      summary: Process readiness probe
+      responses:
+        '200':
+          description: Process ready for traffic
+        '503':
+          description: Not ready
+  /health/diagnostic:
+    get:
+      summary: Operational diagnostics and telemetry
+      responses:
+        '200':
+          description: Diagnostic metrics and dependencies status
+  /api/items:
+    get:
+      summary: List items
+      responses:
+        '200':
+          description: List of pipeline items
